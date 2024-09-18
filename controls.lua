@@ -46,7 +46,7 @@ local ctrls = {
   {
     Name           = "Video",
     ControlType    = "Button",
-    ButtonType     = "Toggle",
+    ButtonType     = "Trigger",
     Count          = props["Input Count"].Value,
     UserPin        = true,
     PinStyle       = "Input"

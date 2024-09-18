@@ -34,7 +34,10 @@ cmds = {
   -- Control Commands
   ["pwr_on" ]  = { "A60100000004011802B8", "Power On" },
   ["pwr_off"]  = { "A60100000004011801BB", "Power Off" },
-  ["input"  ]  = { "A601000000040100xxxx", "Input Selection" }, -- xxxx is placeholder for input number
+  ["input1"  ]  = { "A6010000000701AC0D00000000", "Input Selection" },
+  ["input2"  ]  = { "A6010000000701AC060000000B", "Input Selection" },
+  ["input3"  ]  = { "A6010000000701AC0F00000002", "Input Selection" },
+  ["input4"  ]  = { "A6010000000701AC1900000014", "Input Selection" }, -- xxxx is placeholder for input number
 
   -- Query Commands
   ["pwrq"    ] = { "A601000000030119BC", "Power Status Query" },
@@ -381,6 +384,14 @@ end
           -- The user wants to turn the device off
           Send(cmds["pwr_off"][1])
       end
+  end
+  for i=1,InputCount do
+    Controls['Video'][i].EventHandler = function(ctl)
+      if DebugFunction then print("Video "..i.." Eventhandler called") end
+      if PowerStatus == "1" then
+        Send(cmds["input" .. i][1])
+      end
+    end
   end
 
   IPAddress.EventHandler = function()

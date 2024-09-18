@@ -8,7 +8,6 @@ end
 -- Local Variables
 local CurrentPage = pagenames[props["page_index"].Value]
 local layout, graphics = {}, {}
-local MuteLabels={"Video","Audio","A/V","Freeze"}
 
 -- Color Lookup Table
 local Black        = { 0  , 0  , 0   }
@@ -28,7 +27,7 @@ local BtnGray   = { 130, 130, 130 }
 
 --Controls Layout
 if CurrentPage=="Control" then
-  local offset = math.max(0, (props["Input Count"].Value - 4) * 25)
+  local offset = math.max(0, (props["Input Count"].Value - 4) * 5)
   -- Groupbox
   table.insert(graphics,{
     Type            = "GroupBox",
@@ -48,15 +47,8 @@ if CurrentPage=="Control" then
   })
   table.insert(graphics,{
     Type            = "Header",
-    Text            = "A/V Mute",
-    Position        = {9,122},
-    Size            = {259 + offset*2,10},
-    FontSize        = 14
-  })
-  table.insert(graphics,{
-    Type            = "Header",
     Text            = "Inputs",
-    Position        = {9,195},
+    Position        = {9,122},
     Size            = {259 + offset*2,10},
     FontSize        = 14
   })
@@ -64,7 +56,7 @@ if CurrentPage=="Control" then
   table.insert(graphics,{
     Type            = "Text",
     Text            = "Video",
-    Position        = {2,270},
+    Position        = {2,150},
     Size            = {60,16},
     HTextAlign      = "Right",
     StrokeWidth     = 0,
@@ -101,18 +93,18 @@ if CurrentPage=="Control" then
     table.insert(graphics,{
       Type            = "Text",
       Text            = "" .. i,
-      Position        = {22 + i*50,210},
+      Position        = {22 + i*50,140},
       Size            = {36,14},
       StrokeWidth     = 0,
       FontSize        = 12
     })
     layout["Video "..i]={
-      PrettyName      = "Analog Video Inputs~Analog Video In "..i,
+      PrettyName      = "HDMI "..i,
       Style           = "Button",
       UnlinkOffColor  = true,
       Color           = White,
       OffColor        = BtnGray,
-      Position        = GetIPos(i,props["Input Count"].Value,{x=72,y=270},{x=50,y=52}),
+      Position        = {22 + i*50,150},
       Size            = {36,16}
     }
   end

@@ -1,0 +1,859 @@
+-- HTTPClient Forecast Plugin
+-- by Christophe Bouserez
+-- August 2024
+
+PluginInfo = {
+  Name = "IIYAMA ProLite INYTIUM",
+  Version = "0.0",
+  BuildVersion = "0.0.0.80",
+  Id = "8fc37296-f456-4d8a-b619-1b7c197d448f",
+  Author = "Christophe Bouserez",
+  Description = "This is a plugin to control IIYAMA LH**UHS Screens."
+}
+
+function GetColor(props)
+  return { 27,70,150 }
+end
+
+function GetPrettyName(props) --The name that will initially display when dragged into a design
+  return "IIYAMA LHXXUHS Controls " .. PluginInfo.Version
+end
+
+local pagenames = {"Control", "Setup"}
+function GetPages(props)
+  local pages = {}
+  for ix,name in ipairs(pagenames) do
+    table.insert(pages, {name = pagenames[ix]})
+  end
+  return pages
+end
+
+function GetProperties()
+  local props = {}
+  table.insert(props,{
+    Name   = "Uppercase Messages",
+    Type   = "boolean",
+    Value  = true
+  })
+  table.insert(props,{
+    Name   = "Poll Rate",
+    Type   = "integer",
+    Min    = 1,
+    Max    = 30,
+    Value  = 2
+  })
+  table.insert(props,{
+    Name   = "Warmup Time",
+    Type   = "integer",
+    Min    = 1,
+    Max    = 60,
+    Value  = 15
+  })
+  table.insert(props,{
+    Name   = "Power Off Polling",
+    Type   = "boolean",
+    Value  = true
+  })
+  table.insert(props,{
+    Name   = "Poll Errors",
+    Type   = "boolean",
+    Value  = true
+  })
+  table.insert(props,{
+    Name   = "Input Count",
+    Type   = "integer",
+    Min    = 2,
+    Max    = 36,
+    Value  = 4
+  })
+  table.insert(props,{
+    Name    = "Debug Print",
+    Type    = "enum",
+    Choices = {"None", "Tx/Rx", "Tx", "Rx", "Function Calls", "All"},
+    Value   = "All"
+  })
+  return props
+end
+
+function RectifyProperties(props)
+  if props.plugin_show_debug.Value == false then 
+    props["Debug Print"].IsHidden = false
+  end
+  return props
+end
+
+function GetControls(props)
+  local ctrls = {}
+  --Controls
+  local ctrls = {
+    {
+      Name           = "IPAddress",
+      ControlType    = "Text",
+      DefaultValue   = "172.30.37.118",
+      Count          = 1
+    },
+    {
+      Name           = "Port",
+      ControlType    = "Knob",
+      ControlUnit    = "Integer",
+      DefaultValue   = 5000,
+      Min            = 1,
+      Max            = 65535,
+      Count          = 1,
+    },
+    {
+      Name           = "WOLIPAddress",
+      ControlType    = "Text",
+      DefaultValue   = "172.30.37.255",
+      Count          = 1
+    },
+    {
+      Name           = "WOLMacAddress",
+      ControlType    = "Text",
+      DefaultValue   = "DC:62:94:2B:39:05",
+      Count          = 1
+    },
+    {
+      Name           = "Status",
+      ControlType    = "Indicator",
+      IndicatorType  = Reflect and "StatusGP" or "Status",
+      Count          = 1,
+      UserPin        = true,
+      PinStyle       = "Output"
+    },
+    {
+      Name           = "PowerStatus",
+      ControlType    = "Indicator",
+      IndicatorType  = "Text",
+      Count          = 1,
+      UserPin        = true,
+      PinStyle       = "Output"
+    },
+    {
+      Name           = "Video",
+      ControlType    = "Button",
+      ButtonType     = "Toggle",
+      Count          = props["Input Count"].Value,
+      UserPin        = true,
+      PinStyle       = "Input"
+    },
+    {
+      Name           = "Power",
+      ControlType    = "Button",
+      ButtonType     = "Toggle",
+      IconType       = "Icon",
+      Icon           = "Power",
+      UserPin        = true,
+      PinStyle       = "Both"
+    },
+  }
+  return ctrls
+end
+
+function GetControlLayout(props)
+  local layout   = {}
+  local graphics = {}
+  -- Text display
+  local layout   = {}
+  local graphics = {}
+  local function GetIPos(qty, rowlen, base, ofs)
+    local row,col = (qty-1)//(rowlen),(qty-1)%rowlen
+    return { base.x + col*ofs.x, base.y + row*ofs.y }
+  end
+  -- Local Variables
+  local CurrentPage = pagenames[props["page_index"].Value]
+  local layout, graphics = {}, {}
+  local MuteLabels={"Video","Audio","A/V","Freeze"}
+  
+  -- Color Lookup Table
+  local Black        = { 0  , 0  , 0   }
+  local White        = { 255, 255, 255 }
+  local BGGray       = { 236, 236, 236 }
+  local BtnGrn       = { 0  , 199, 0   }
+  local BtnGrnOff    = { 0  , 127, 0   }
+  local BtnGrnOn     = { 0  , 255, 0   }
+  local LEDRedOff    = { 127, 0  , 0   }
+  local LEDRedOn     = { 255, 0  , 0   }
+  local LEDGreenOff  = { 0  , 127, 0   }
+  local LEDGreenOn   = { 0  , 255, 0   }
+  local LEDYellowOff = { 127, 127, 0   }
+  local LEDYellowOn  = { 255, 255, 0   }
+  
+  local BtnGray   = { 130, 130, 130 }
+  
+  --Controls Layout
+  if CurrentPage=="Control" then
+    local offset = math.max(0, (props["Input Count"].Value - 4) * 25)
+    -- Groupbox
+    table.insert(graphics,{
+      Type            = "GroupBox",
+      Fill            = BGGray,
+      StrokeWidth     = 1,
+      CornerRadius    = 0,
+      Position        = {0,0},
+      Size            = {278 + offset*2,425}
+    })
+      -- Header
+    table.insert(graphics,{
+      Type            = "Header",
+      Text            = "Power",
+      Position        = {9,59},
+      Size            = {259 + offset*2,10},
+      FontSize        = 14
+    })
+    table.insert(graphics,{
+      Type            = "Header",
+      Text            = "A/V Mute",
+      Position        = {9,122},
+      Size            = {259 + offset*2,10},
+      FontSize        = 14
+    })
+    table.insert(graphics,{
+      Type            = "Header",
+      Text            = "Inputs",
+      Position        = {9,195},
+      Size            = {259 + offset*2,10},
+      FontSize        = 14
+    })
+      -- Text
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "Video",
+      Position        = {2,270},
+      Size            = {60,16},
+      HTextAlign      = "Right",
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
+      -- Logo
+    table.insert(graphics,{
+      Type            = "Svg",
+      Image           = PJLinkLogo,
+      Position        = {65 + offset,12},
+      Size            = {149,36}
+    })
+      -- Controls
+    layout["Power"]={
+      PrettyName      = "Device Power",
+      Style           = "Button",
+      ButtonStyle     = "Toggle",
+      Color           = {241,53,45},
+      OffColor        = {167,35,35},
+      UnlinkOffColor  = true,
+      Position        = {36 + offset,84},
+      Size            = {33,25}
+    }
+    layout["PowerStatus"]={
+      PrettyName      = "Device's Power Status",
+      Style           = "Textdisplay",
+      FontSize        = 12,
+      Color           = White,
+      IsReadOnly      = true,
+      Position        = {86 + offset,84},
+      Size            = {149,22}
+    }
+    for i=1,props["Input Count"].Value do
+      table.insert(graphics,{
+        Type            = "Text",
+        Text            = "" .. i,
+        Position        = {22 + i*50,210},
+        Size            = {36,14},
+        StrokeWidth     = 0,
+        FontSize        = 12
+      })
+      layout["Video "..i]={
+        PrettyName      = "Analog Video Inputs~Analog Video In "..i,
+        Style           = "Button",
+        UnlinkOffColor  = true,
+        Color           = White,
+        OffColor        = BtnGray,
+        Position        = GetIPos(i,props["Input Count"].Value,{x=72,y=270},{x=50,y=52}),
+        Size            = {36,16}
+      }
+    end
+    elseif CurrentPage == "Setup" then
+      -- Controls
+    layout["IPAddress"]={
+      PrettyName      = "Device's IP Address",
+      Style           = "Text",
+      Color           = White,
+      Position        = {128,79},
+      Size            = {93,16},
+      FontSize        = 9
+    }
+    layout["Port"]={Style="Text",
+      PrettyName      = "Device's Port",
+      Position        = {128,99},
+      Size            = {93,16},
+      Color           = White,
+      CornerRadius    = 0,
+      Margin          = 0,
+      Padding         = 0,
+      StrokeColor     = LEDStrk,
+      StrokeWidth     = 1
+    }
+    layout["WOLIPAddress"]={
+      PrettyName      = "WOL Device's IP Address",
+      Style           = "Text",
+      Color           = White,
+      Position        = {128,220},
+      Size            = {120,16},
+      FontSize        = 9
+    }
+    layout["WOLMacAddress"]={Style="Text",
+      PrettyName      = "TV Mac Address",
+      Position        = {128,240},
+      Size            = {120,16},
+      Color           = White,
+      CornerRadius    = 0,
+      Margin          = 0,
+      Padding         = 0,
+      StrokeColor     = LEDStrk,
+      StrokeWidth     = 1
+    }
+    layout["Status"]={
+      PrettyName      = "Connection Status",
+      Style           = "Text",
+      TextBoxStyle    = "Normal",
+      Position        = {9,163},
+      Size            = {259,28}
+    } 
+      -- Groupbox
+    table.insert(graphics,{
+      Type            = "GroupBox",
+      Fill            = BGGray,
+      StrokeWidth     = 1,
+      CornerRadius    = 0,
+      Position        = {0,0},
+      Size            = {278,320}
+    })
+      -- Header
+    table.insert(graphics,{
+      Type            = "Header",
+      Text            = "Connection",
+      Position        = {9,59},
+      Size            = {259,6},
+      FontSize        = 14
+  
+    })
+    table.insert(graphics,{
+      Type            = "Header",
+      Text            = "Wake On LAN",
+      Position        = {9,206},
+      Size            = {259,6},
+      FontSize        = 14
+    })
+        -- Text
+        table.insert(graphics,{
+          Type            = "Text",
+          Text            = "WOLIP :",
+          HTextAlign      = "Right",
+          Position        = {5,220},
+          Size            = {120,16},
+          StrokeWidth     = 0,
+          FontSize        = 12
+        })
+        table.insert(graphics,{
+          Type            = "Text",
+          Text            = "TV MacAddress:",
+          HTextAlign      = "Right",
+          Position        = {5,240},
+          Size            = {120,16},
+          StrokeWidth     = 0,
+          FontSize        = 12
+        })
+  
+      -- Text
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "IP Address:",
+      HTextAlign      = "Right",
+      Position        = {48,79},
+      Size            = {75,16},
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "Port:",
+      HTextAlign      = "Right",
+      Position        = {48,99},
+      Size            = {75,16},
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "Connection Status",
+      Position        = {63,147},
+      Size            = {150,12},
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
+      -- Logo
+    table.insert(graphics,{
+      Type            = "Svg",
+      Image           = PJLinkLogo,
+      Position        = {65,12},
+      Size            = {149,36}
+    })
+      -- Version Number
+    table.insert(graphics,{
+      Type            = "Label",
+      Text            = string.format("Version %s",PluginInfo.Version),
+      Position        = {215,310},
+      Size            = {60,10},
+      FontSize        = 7,
+      HTextAlign      = "Right"
+    })
+  end
+  return layout, graphics
+end
+
+--Start event based logic
+if Controls then
+  --Start event based logic
+  if Controls then
+    -- Control Aliases
+    IPAddress = Controls.IPAddress
+    WOLIPAddress = Controls.WOLIPAddress
+    WOLMacAddress = Controls.WOLMacAddress
+    Port=Controls.Port
+    PowerStatusFB = Controls.PowerStatus
+    Status = Controls.Status
+    Power = Controls.Power
+    
+    
+    -- Global Constants
+    PowerOn = { 40, 197, 38 }
+    PowerOff = { 255, 50, 50 }
+    WarmUp = { 255, 242, 62 }
+    PollRate = Properties["Poll Rate"].Value
+    WarmupTimeout = Properties["Warmup Time"].Value
+    InputCount = Properties["Input Count"].Value
+    
+    -- Global Variables
+    PowerStatus = false
+    DebugTx=false
+    DebugRx=false
+    DebugFunction=false
+    DebugPrint=Properties["Debug Print"].Value
+    InputSwitchResponse = ""
+    CurrentInputNameRequest = nil
+    WarmupTime = false
+    
+    
+  -- Hexadecimal Command Definitions for IIYAMA ProLite
+  cmds = {
+    -- Control Commands
+    ["pwr_on" ]  = { "A60100000004011802B8", "Power On" },
+    ["pwr_off"]  = { "A60100000004011801BB", "Power Off" },
+    ["input"  ]  = { "A601000000040100xxxx", "Input Selection" }, -- xxxx is placeholder for input number
+  
+    -- Query Commands
+    ["pwrq"    ] = { "A601000000030119BC", "Power Status Query" },
+    ["inputq"  ] = { "A601000000030200xx", "Input Status Query" } -- xx for specific input query
+  }
+    
+    if not Properties["Uppercase Messages"].Value then
+      for key,value in pairs(cmds)do
+        value[1] = string.lower(value[1])
+      end
+    end
+    
+    
+    --Init States
+    ConnectionStatus = "Disconnected"
+    Power.Boolean = false
+    status_state = {OK=0,COMPROMISED=1,FAULT=2,NOTPRESENT=3,MISSING=4,INITIALIZING=5}
+    
+    
+    --Input tables
+    RGBin,Videoin,Digitalin,Storagein,Networkin,Internalin = {},{},{},{},{},{}
+    
+    
+    -- Timers
+    Heartbeat = Timer.New()
+    WarmupTimer = Timer.New()
+    RetryTimer = Timer.New()
+    
+    function ReportStatus(state,msg)
+      if DebugFunction then print("ReportStatus() called") end
+      if state == "OK" and Properties["Poll Errors"].Value then
+        for j,name in ipairs({"Fan", "Lamp", "Temperature", "Cover", "Filter", "Other"}) do
+          if Controls[name.."Status"][2].Boolean then
+            msg = msg .. " " .. name .. " warning;"
+            state = "COMPROMISED"
+          elseif Controls[name.."Status"][3].Boolean then
+            msg = msg .. " " .. name .. " fault;"
+            state = "COMPROMISED"
+          end
+        end
+      end
+      Status.Value = status_state[state]
+      Status.String = msg
+    end
+  
+  
+  
+  
+  
+    -- Sockets
+    IIYAMA = TcpSocket.New()
+    IIYAMA.ReconnectTimeout = 5
+    IIYAMA.ReadTimeout = math.max(10, WarmupTimeout+1)
+    IIYAMA.WriteTimeout = math.max(10, WarmupTimeout+1)
+    
+    
+    -- Functions
+    -- A function to determine common print statement scenarios for troubleshooting
+    function SetupDebugPrint()
+      if DebugPrint=="Tx/Rx" then
+        DebugTx,DebugRx=true,true
+      elseif DebugPrint=="Tx" then
+        DebugTx=true
+      elseif DebugPrint=="Rx" then
+        DebugRx=true
+      elseif DebugPrint=="Function Calls" then
+        DebugFunction=true
+      elseif DebugPrint=="All" then
+        DebugTx,DebugRx,DebugFunction=true,true,true
+      end
+    end
+    
+    function Connect()
+      if DebugFunction then print("Connect() called") end
+      Heartbeat:Stop()
+      if IIYAMA.IsConnected then
+        IIYAMA:Disconnect()
+      end
+      ConnectionStatus = "Initializing"
+      print("Connecting to "..ipaddress..":"..Port.Value)
+      IIYAMA:Connect(ipaddress,Port.Value)
+    end
+    
+    function Init()
+      if DebugFunction then print("Init() called") end
+      Disconnected()
+      ipaddress = IPAddress.String
+      if ipaddress ~= "" then
+        Connect()
+      else
+        ReportStatus("MISSING","No IP Address")
+      end
+    end
+    
+    function Disconnected()
+      if DebugFunction then print("Disconnected() called") end
+      for i,obj in ipairs({ManufacturerFB, ModelFB, PrjNameFB, PowerStatusFB, SWVersion, SerialNumber}) do
+        obj.String = "Connect Device"
+      end
+      RGBin,Videoin,Digitalin,Storagein,Networkin,Internalin = {},{},{},{},{},{}
+      ConnectionStatus = "Disconnected"
+      Heartbeat:Stop()
+      WarmupTimer:Stop()
+      if IIYAMA.IsConnected then
+        IIYAMA:Disconnect()
+        print("Disconnected from IIYAMA")
+      end
+    end
+    
+    function Send(cmd)
+      if IIYAMA.IsConnected then
+        local hexCmd = cmd:gsub("%x%x", function(byte) return string.char(tonumber(byte, 16)) end)
+        print("Sending: " .. cmd) -- For debugging purposes, prints the hex command
+        IIYAMA:Write(hexCmd)
+      else
+          print("Not connected. Cannot send: " .. cmd)
+      end
+    end
+  
+    function SendWOL(WOLIPAddress, WOLMacAddress)
+      -- Create the magic packet
+      local magicPacket = CreateMagicPacket(WOLMacAddress)
+      print(WOLMacAddress)
+      if magicPacket == nil then
+          print("Failed to create WOL magic packet")
+          return
+      end
+  
+      -- Create the UDP socket
+      local udpSocket = UdpSocket.New() -- Enable broadcast
+  
+      -- Send the magic packet to UDP port 9 on the broadcast address
+      print("Sending WOL magic packet to " .. WOLIPAddress .. " on port 9")
+      udpSocket:Open()
+      udpSocket:Send(WOLIPAddress, 9, magicPacket)
+  
+      -- Close the UDP socket
+      udpSocket:Close()
+  end
+  
+    
+    function ShowInputs(r, v, d, s, n, internal)
+      if DebugFunction then print("ShowInputs() called") end
+      if r > 0 then RGBNo.IsInvisible = true end
+      if v > 0 then VidNo.IsInvisible = true end
+      if d > 0 then DigNo.IsInvisible = true end
+      if s > 0 then StoNo.IsInvisible = true end
+      if n > 0 then NetNo.IsInvisible = true end
+      if internal > 0 then IntNo.IsInvisible = true end
+      for i=1, math.min(InputCount, r) do
+        Controls['RGB'][i].IsInvisible = false
+        Controls['RGBName'][i].IsInvisible = false
+      end
+      for i=1, math.min(InputCount, v) do
+        Controls['Video'][i].IsInvisible = false
+        Controls['VideoName'][i].IsInvisible = false
+      end
+      for i=1, math.min(InputCount, d) do
+        Controls['Digital'][i].IsInvisible = false
+        Controls['DigitalName'][i].IsInvisible = false
+      end
+      for i=1, math.min(InputCount, s) do
+        Controls['Storage'][i].IsInvisible = false
+        Controls['StorageName'][i].IsInvisible = false
+      end
+      for i=1, math.min(InputCount, n) do
+        Controls['Network'][i].IsInvisible = false
+      end
+      for i=1, math.min(InputCount, internal) do
+        Controls['Internal'][i].IsInvisible = false
+        Controls['InternalName'][i].IsInvisible = false
+      end
+    end
+    
+      -- Repeated Queries
+    function PowerPoll()
+      print("Power Polling")
+      Send(cmds["pwrq"][1])
+    end
+    
+      -- Input Name queries (one execution per update to input list)
+    function SendIfNameUnknown(target, inputNumber)
+      if target.String == "" then
+        CurrentInputNameRequest = target
+        Send("%2"..cmds["inptnq"][1]..inputNumber)
+        return true
+      end
+      return false
+    end
+    
+    
+    
+    function NameParser(Name)
+      if DebugFunction then print("NameParser() called") end
+      if Name:sub(1,3) == "ERR" or Name == "" then
+        PrjNameFB.String = "Name not available"
+      else
+        PrjNameFB.String = Name
+      end
+    end
+    
+    function ManufacturerParser(Manufacturer)
+      if DebugFunction then print("ManufacturerParser() called") end
+      if Manufacturer == "ERR2" or Manufacturer == "ERR3" or Manufacturer == "" then
+        ManufacturerFB.String = "Manufacturer not available"
+      else
+        ManufacturerFB.String = Manufacturer
+      end
+    end
+    
+    function ModelParser(Model)
+      if DebugFunction then print("ModelParser() called") end
+      if Model == "ERR2" or Model == "" then
+        ModelFB.String = "Model not available"
+      else
+        ModelFB.String = Model
+      end
+    end
+    
+    function PowerParser(PowerState)
+      if DebugFunction then print("PowerParser() called") end
+      if PowerState == "0" then
+        PowerStatus = PowerState
+        PowerStatusFB.String = "TV is OFF"
+        PowerStatusFB.Color = "White"
+        Power.Boolean = false
+      elseif PowerState == "1" then
+        PowerStatus = PowerState
+        PowerStatusFB.String = "TV is ON"
+        PowerStatusFB.Color = "White"
+        Power.Boolean = true 
+      end
+    end
+    
+  
+    function DeviceInfoParser(data)
+      if DebugFunction then print("DeviceInfoParser() called") end
+      
+      -- Check if data matches the power state response from the TV
+      -- The data should be in the form of the binary string you provided.
+      
+      local powerState = data:byte(8)  -- 9th byte seems to indicate power status (based on your example)
+      
+      -- Logging for Debugging:
+      print(string.format("Received byte 8 (Power State): %02X", powerState))
+      
+      -- We will assume that \02 means "on" and \01 means "off"
+      if powerState == 0x02 then
+          PowerParser("1")  -- TV is ON
+      else
+          PowerParser("0")  -- TV is OFF
+          print("Unknown Power State in DeviceInfoParser: " .. tostring(powerState))
+      end
+  end
+  
+  
+  
+    function ErrorStatusParser(ErrorData)
+      if DebugFunction then print("ErrorStatusParser() called") end
+      if ErrorData:sub(1,3) == "ERR" or #ErrorData<6 then
+        print("Error retrieving status infomration")
+      else
+        for i,name in ipairs({"Other"}) do
+          local errorLevel = tonumber(ErrorData:sub(i,i)) + 1
+          for j=1,3 do
+            Controls[name.."Status"][j].Boolean = j==errorLevel
+          end
+        end
+      end
+    end
+    
+    function InputResolutionParser(InputData)
+      if DebugFunction then print("InputResolutionParser() called") end
+      if InputData:sub(1,3) == "ERR" then
+        Controls["InputResolution"].String = "Unavailable"
+      elseif InputData:sub(1,3) == "-" then
+        Controls["InputResolution"].String = "No Signal Input"
+      elseif InputData:sub(1,3) == "*" then
+        Controls["InputResolution"].String = "Unknown Signal"
+      else
+        Controls["InputResolution"].String = InputData
+      end
+    end
+    
+    function RecommendedResolutionParser(InputData)
+      if DebugFunction then print("InputResolutionParser() called") end
+      if InputData:sub(1,3) == "ERR" then
+        Controls["RecommendedResolution"].String = "Unavailable"
+      else
+        Controls["RecommendedResolution"].String = InputData
+      end
+    end
+    -- Event Handlers
+  -- Modify the socket event handler to pass the data to the parser:
+  IIYAMA.EventHandler = function(sock, evt, err)
+    if evt == TcpSocket.Events.Connected then
+        print("Connected to IIYAMA")
+        Heartbeat:Start(PollRate)
+    elseif evt == TcpSocket.Events.Data then
+        local response = sock:Read(32)  -- Read the full response (or adjust bytes based on expected length)
+        if response and #response > 0 then
+            print("Received raw data: ")
+            for i = 1, #response do
+                print(string.format("%02X ", response:byte(i)))  -- Print each byte in hexadecimal for debugging
+            end
+            
+            -- Parse the data, particularly looking for power state info
+            DeviceInfoParser(response)
+        else
+            print("Received no valid data.")
+        end
+    elseif evt == TcpSocket.Events.Closed then
+        print("Connection closed")
+        Disconnected()
+    elseif evt == TcpSocket.Events.Error then
+        print("Socket error: " .. tostring(err))
+    elseif evt == TcpSocket.Events.Timeout then
+        print("Connection timeout")
+    end
+  end
+    
+      -- Control EventHandlers
+      Power.EventHandler = function()
+        if DebugFunction then print("Power Eventhandler called") end
+    
+        if Power.Boolean == true then
+          print(PowerStatus)
+          print(PowerStatusFB)
+          print(Power.Boolean)
+            -- The user wants to turn the device on
+            if true then
+                -- If the device is currently off, try to wake it using WOL
+                print("TV is off. Sending Wake-on-LAN...")
+                SendWOL(WOLIPAddress.String, WOLMacAddress.String)
+            else
+                print("TV is already on.")
+            end
+    
+            PowerStatusFB.String = "Warming up..."
+            PowerStatusFB.Color = "Yellow"
+            WarmupTime = true
+            WarmupTimer:Start(WarmupTimeout)
+        elseif Power.Boolean == false then
+            -- The user wants to turn the device off
+            Send(cmds["pwr_off"][1])
+        end
+    end
+  
+    IPAddress.EventHandler = function()
+      if DebugFunction then print("IPAddress Eventhandler called") end
+      Init()
+    end
+    
+    Port.EventHandler = function()
+      if DebugFunction then print("Port Eventhandler called") end
+      Init()
+    end
+    WOLIPAddress.EventHandler = function()
+      if DebugFunction then print("Port Eventhandler called") end
+      print(WOLIPAddress)
+      Init()
+    end
+    WOLMacAddress.EventHandler = function()
+      if DebugFunction then print("Port Eventhandler called") end
+      print(WOLMacAddress)
+      Init()
+    end
+    
+      -- Timer EventHandlers
+    Heartbeat.EventHandler = function()
+      if DebugFunction then print("Heartbeat Eventhandler called") end
+      PowerPoll()
+    end
+    
+    RetryTimer.EventHandler = function()
+      if DebugFunction then print("RetryAuthentication() called") end
+      if not IIYAMA.IsConnected then
+        Connect()
+      end
+      RetryTimer:Stop()
+    end
+    
+    -- Start at runtime
+    SetupDebugPrint()
+    Init()
+  end
+  
+  function CreateMagicPacket(macAddress)
+    macAddress = macAddress:gsub(":", "")
+    
+    -- Ensure MAC address is 12 hexadecimal characters
+    if #macAddress ~= 12 then
+        print("Invalid MAC address length")
+        return nil
+    end
+  
+    -- Convert MAC address into bytes
+    local macBytes = ""
+    for i = 1, #macAddress, 2 do
+        macBytes = macBytes .. string.char(tonumber(macAddress:sub(i, i+1), 16))
+    end
+  
+    -- Magic packet = 6 bytes of 0xFF + 16 repetitions of the MAC address
+    local magicPacket = string.rep(string.char(0xFF), 6) .. string.rep(macBytes, 16)
+  
+    return magicPacket
+  end
+end

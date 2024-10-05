@@ -15,7 +15,7 @@ table.insert(props,{
   Type   = "integer",
   Min    = 1,
   Max    = 60,
-  Value  = 15
+  Value  = 30
 })
 table.insert(props,{
   Name   = "Power Off Polling",

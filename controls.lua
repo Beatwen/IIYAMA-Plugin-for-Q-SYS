@@ -3,7 +3,7 @@ local ctrls = {
   {
     Name           = "IPAddress",
     ControlType    = "Text",
-    DefaultValue   = "172.30.37.118",
+    DefaultValue   = "172.10.0.10",
     Count          = 1
   },
   {
@@ -18,7 +18,7 @@ local ctrls = {
   {
     Name           = "WOLIPAddress",
     ControlType    = "Text",
-    DefaultValue   = "172.30.37.255",
+    DefaultValue   = "255.255.255.255",
     Count          = 1
   },
   {
@@ -30,7 +30,7 @@ local ctrls = {
   {
     Name           = "Status",
     ControlType    = "Indicator",
-    IndicatorType  = Reflect and "StatusGP" or "Status",
+    IndicatorType  = "Status",
     Count          = 1,
     UserPin        = true,
     PinStyle       = "Output"
@@ -46,8 +46,16 @@ local ctrls = {
   {
     Name           = "Video",
     ControlType    = "Button",
-    ButtonType     = "Trigger",
+    ButtonType     = "Toggle",
     Count          = props["Input Count"].Value,
+    UserPin        = true,
+    PinStyle       = "Input"
+  },
+  {
+    Name           = "VideoCMS",
+    ControlType    = "Button",
+    ButtonType     = "Toggle",
+    Count          = 1,
     UserPin        = true,
     PinStyle       = "Input"
   },
@@ -59,5 +67,25 @@ local ctrls = {
     Icon           = "Power",
     UserPin        = true,
     PinStyle       = "Both"
+  },
+  {
+    Name = "Gain",
+    ControlType = "Knob",
+    ControlUnit = "Integer",
+    Min = 0,
+    Max = 100,
+    UserPin = true,
+    PinStyle = "Both",
+    Count = 1,
+  },
+  {
+    Name = "AudioOut",
+    ControlType = "Knob",
+    ControlUnit = "Integer",
+    Min = 0,
+    Max = 100,
+    UserPin = true,
+    PinStyle = "Both",
+    Count = 1,
   },
 }

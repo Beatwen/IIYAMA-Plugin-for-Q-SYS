@@ -62,6 +62,34 @@ if CurrentPage=="Control" then
     StrokeWidth     = 0,
     FontSize        = 12
   })
+    -- Text
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "CMS Input",
+      Position        = {2,170},
+      Size            = {60,16},
+      HTextAlign      = "Right",
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "Gain",
+      Position        = {2,200},
+      Size            = {60,16},
+      HTextAlign      = "Right",
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
+    table.insert(graphics,{
+      Type            = "Text",
+      Text            = "Audio out",
+      Position        = {2,240},
+      Size            = {60,16},
+      HTextAlign      = "Right",
+      StrokeWidth     = 0,
+      FontSize        = 12
+    })
     -- Logo
   table.insert(graphics,{
     Type            = "Svg",
@@ -108,6 +136,27 @@ if CurrentPage=="Control" then
       Size            = {36,16}
     }
   end
+  layout["VideoCMS"]={
+    PrettyName      = "CMS Input",
+    Style           = "Button",
+    UnlinkOffColor  = true,
+    Color           = White,
+    OffColor        = BtnGray,
+    Position        = {22 + 50,170},
+    Size            = {36,16}
+  }
+  layout["Gain"]={
+    PrettyName      = "Gain",
+    Style           = "Knob",
+    Position        = {22 + 50,190},
+    Size            = {36,36}
+  }
+  layout["AudioOut"]={
+    PrettyName      = "Audio output",
+    Style           = "Knob",
+    Position        = {22 + 50,230},
+    Size            = {36,36}
+  }
   elseif CurrentPage == "Setup" then
     -- Controls
   layout["IPAddress"]={
